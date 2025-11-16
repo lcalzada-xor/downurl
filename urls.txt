@@ -1,0 +1,4 @@
+# Example URLs for testing
+https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js
+https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js
+https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js

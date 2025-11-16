@@ -1,0 +1,8 @@
+# Example headers file for downurl
+# Format: Header-Name: value
+
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+X-API-Key: your-api-key-here
+X-Custom-Header: custom-value
+User-Agent: MyCustomBot/1.0
+Accept: application/json

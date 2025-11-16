@@ -1,0 +1,7 @@
+# Example cookies file for downurl
+# Format: name=value
+
+session=abc123def456xyz789
+token=your-session-token-here
+user_id=12345
+remember_me=true
