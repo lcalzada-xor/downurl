@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/llvch/downurl/internal/filter"
-	"github.com/llvch/downurl/internal/jsanalyzer"
-	"github.com/llvch/downurl/internal/output"
-	"github.com/llvch/downurl/internal/scanner"
-	"github.com/llvch/downurl/pkg/models"
+	"github.com/lcalzada-xor/downurl/internal/filter"
+	"github.com/lcalzada-xor/downurl/internal/jsanalyzer"
+	"github.com/lcalzada-xor/downurl/internal/output"
+	"github.com/lcalzada-xor/downurl/internal/scanner"
+	"github.com/lcalzada-xor/downurl/pkg/models"
 )
 
 // Processor handles post-download processing

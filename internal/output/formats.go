@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/llvch/downurl/internal/scanner"
+	"github.com/lcalzada-xor/downurl/internal/scanner"
 )
 
 // Format represents output format type

@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/llvch/downurl/internal/auth"
+	"github.com/lcalzada-xor/downurl/internal/auth"
 )
 
 // BuildAuthProvider creates an auth provider from configuration

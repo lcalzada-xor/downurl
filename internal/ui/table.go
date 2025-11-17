@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/llvch/downurl/pkg/models"
+	"github.com/lcalzada-xor/downurl/pkg/models"
 )
 
 // ResultsTable displays download results in a table format

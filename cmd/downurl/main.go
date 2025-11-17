@@ -10,17 +10,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/llvch/downurl/internal/config"
-	"github.com/llvch/downurl/internal/downloader"
-	"github.com/llvch/downurl/internal/filter"
-	"github.com/llvch/downurl/internal/parser"
-	"github.com/llvch/downurl/internal/processor"
-	"github.com/llvch/downurl/internal/ratelimit"
-	"github.com/llvch/downurl/internal/reporter"
-	"github.com/llvch/downurl/internal/storage"
-	"github.com/llvch/downurl/internal/ui"
-	"github.com/llvch/downurl/internal/watcher"
-	"github.com/llvch/downurl/pkg/models"
+	"github.com/lcalzada-xor/downurl/internal/config"
+	"github.com/lcalzada-xor/downurl/internal/downloader"
+	"github.com/lcalzada-xor/downurl/internal/filter"
+	"github.com/lcalzada-xor/downurl/internal/parser"
+	"github.com/lcalzada-xor/downurl/internal/processor"
+	"github.com/lcalzada-xor/downurl/internal/ratelimit"
+	"github.com/lcalzada-xor/downurl/internal/reporter"
+	"github.com/lcalzada-xor/downurl/internal/storage"
+	"github.com/lcalzada-xor/downurl/internal/ui"
+	"github.com/lcalzada-xor/downurl/internal/watcher"
+	"github.com/lcalzada-xor/downurl/pkg/models"
 )
 
 func main() {

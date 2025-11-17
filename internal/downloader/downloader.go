@@ -8,11 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/llvch/downurl/internal/filter"
-	"github.com/llvch/downurl/internal/parser"
-	"github.com/llvch/downurl/internal/ratelimit"
-	"github.com/llvch/downurl/internal/storage"
-	"github.com/llvch/downurl/pkg/models"
+	"github.com/lcalzada-xor/downurl/internal/filter"
+	"github.com/lcalzada-xor/downurl/internal/parser"
+	"github.com/lcalzada-xor/downurl/internal/ratelimit"
+	"github.com/lcalzada-xor/downurl/internal/storage"
+	"github.com/lcalzada-xor/downurl/pkg/models"
 )
 
 // Downloader orchestrates the download process with worker pool
