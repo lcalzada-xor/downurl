@@ -11,28 +11,32 @@ import (
 // FileStorage handles file system operations
 type FileStorage struct {
 	baseDir   string
+	strategy  StorageStrategy
 	fileLocks map[string]*sync.Mutex
 	mu        sync.Mutex
 }
 
-// NewFileStorage creates a new FileStorage instance
-func NewFileStorage(baseDir string) *FileStorage {
+// NewFileStorage creates a new FileStorage instance with a storage strategy
+func NewFileStorage(baseDir string, mode string) *FileStorage {
 	return &FileStorage{
 		baseDir:   baseDir,
+		strategy:  NewStrategy(mode),
 		fileLocks: make(map[string]*sync.Mutex),
 	}
 }
 
-// SaveFile saves data to a file in the host's js directory
-func (fs *FileStorage) SaveFile(host, filename string, data []byte) (string, error) {
-	// Create directory structure: baseDir/host/js/
-	dir := filepath.Join(fs.baseDir, host, "js")
+// SaveFile saves data to a file using the configured storage strategy
+func (fs *FileStorage) SaveFile(host, urlPath, filename string, data []byte) (string, error) {
+	// Use strategy to determine directory and filename
+	dir, finalFilename := fs.strategy.GeneratePath(fs.baseDir, host, urlPath, filename)
+
+	// Ensure directory exists
 	if err := fs.ensureDir(dir); err != nil {
 		return "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Full file path
-	fullPath := filepath.Join(dir, filename)
+	fullPath := filepath.Join(dir, finalFilename)
 
 	// Get or create lock for this file path
 	fs.mu.Lock()
@@ -50,7 +54,7 @@ func (fs *FileStorage) SaveFile(host, filename string, data []byte) (string, err
 	// Check if file already exists
 	if _, err := os.Stat(fullPath); err == nil {
 		// File exists, create unique name with counter
-		return fs.saveFileWithUniqueName(dir, filename, fullPath, data)
+		return fs.saveFileWithUniqueName(dir, finalFilename, fullPath, data)
 	}
 
 	// Write file
@@ -61,16 +65,18 @@ func (fs *FileStorage) SaveFile(host, filename string, data []byte) (string, err
 	return fullPath, nil
 }
 
-// SaveFileFromReader saves data from an io.Reader to a file in the host's js directory
-func (fs *FileStorage) SaveFileFromReader(host, filename string, reader io.Reader) (string, int64, error) {
-	// Create directory structure: baseDir/host/js/
-	dir := filepath.Join(fs.baseDir, host, "js")
+// SaveFileFromReader saves data from an io.Reader to a file using the configured storage strategy
+func (fs *FileStorage) SaveFileFromReader(host, urlPath, filename string, reader io.Reader) (string, int64, error) {
+	// Use strategy to determine directory and filename
+	dir, finalFilename := fs.strategy.GeneratePath(fs.baseDir, host, urlPath, filename)
+
+	// Ensure directory exists
 	if err := fs.ensureDir(dir); err != nil {
 		return "", 0, fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Full file path
-	fullPath := filepath.Join(dir, filename)
+	fullPath := filepath.Join(dir, finalFilename)
 
 	// Get or create lock for this file path
 	fs.mu.Lock()
@@ -88,7 +94,7 @@ func (fs *FileStorage) SaveFileFromReader(host, filename string, reader io.Reade
 	// Check if file already exists
 	if _, err := os.Stat(fullPath); err == nil {
 		// File exists, create unique name with counter
-		return fs.saveFileFromReaderWithUniqueName(dir, filename, fullPath, reader)
+		return fs.saveFileFromReaderWithUniqueName(dir, finalFilename, fullPath, reader)
 	}
 
 	// Create file

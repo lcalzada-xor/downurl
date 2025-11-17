@@ -5,10 +5,12 @@ import (
 	"io"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/llvch/downurl/internal/filter"
 	"github.com/llvch/downurl/internal/parser"
+	"github.com/llvch/downurl/internal/ratelimit"
 	"github.com/llvch/downurl/internal/storage"
 	"github.com/llvch/downurl/pkg/models"
 )
@@ -48,16 +50,30 @@ type Job struct {
 	Index int
 }
 
+// ProgressCallback is a function that's called when progress is made
+type ProgressCallback func(completed, total int)
+
+// Result is an alias for models.DownloadResult for backward compatibility
+type Result = models.DownloadResult
+
 // DownloadAll downloads all URLs using a worker pool
-func (d *Downloader) DownloadAll(ctx context.Context, urls []string) []models.DownloadResult {
+func (d *Downloader) DownloadAll(ctx context.Context, urls []string) []*models.DownloadResult {
+	return d.DownloadAllWithProgress(ctx, urls, nil)
+}
+
+// DownloadAllWithProgress downloads all URLs with progress callback
+func (d *Downloader) DownloadAllWithProgress(ctx context.Context, urls []string, callback ProgressCallback) []*models.DownloadResult {
 	jobs := make(chan Job, len(urls))
 	results := make(chan models.DownloadResult, len(urls))
+
+	var completed int32
+	totalJobs := len(urls)
 
 	// Start worker pool
 	var wg sync.WaitGroup
 	for i := 0; i < d.workers; i++ {
 		wg.Add(1)
-		go d.worker(ctx, &wg, jobs, results)
+		go d.workerWithCallback(ctx, &wg, jobs, results, &completed, totalJobs, callback)
 	}
 
 	// Send jobs to workers
@@ -73,9 +89,47 @@ func (d *Downloader) DownloadAll(ctx context.Context, urls []string) []models.Do
 	}()
 
 	// Collect results
-	allResults := make([]models.DownloadResult, 0, len(urls))
+	allResults := make([]*models.DownloadResult, 0, len(urls))
 	for result := range results {
-		allResults = append(allResults, result)
+		res := result
+		allResults = append(allResults, &res)
+	}
+
+	return allResults
+}
+
+// DownloadAllWithRateLimit downloads all URLs with rate limiting
+func (d *Downloader) DownloadAllWithRateLimit(ctx context.Context, urls []string, limiter *ratelimit.Limiter, callback ProgressCallback) []*models.DownloadResult {
+	jobs := make(chan Job, len(urls))
+	results := make(chan models.DownloadResult, len(urls))
+
+	var completed int32
+	totalJobs := len(urls)
+
+	// Start worker pool
+	var wg sync.WaitGroup
+	for i := 0; i < d.workers; i++ {
+		wg.Add(1)
+		go d.workerWithRateLimit(ctx, &wg, jobs, results, limiter, &completed, totalJobs, callback)
+	}
+
+	// Send jobs to workers
+	for i, url := range urls {
+		jobs <- Job{URL: url, Index: i}
+	}
+	close(jobs)
+
+	// Wait for all workers to finish and close results channel
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results
+	allResults := make([]*models.DownloadResult, 0, len(urls))
+	for result := range results {
+		res := result
+		allResults = append(allResults, &res)
 	}
 
 	return allResults
@@ -113,6 +167,121 @@ func (d *Downloader) worker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan
 		case results <- result:
 		case <-ctx.Done():
 			return
+		}
+	}
+}
+
+// workerWithCallback processes download jobs with progress callback
+func (d *Downloader) workerWithCallback(ctx context.Context, wg *sync.WaitGroup, jobs <-chan Job, results chan<- models.DownloadResult, completed *int32, total int, callback ProgressCallback) {
+	defer wg.Done()
+
+	for job := range jobs {
+		// Check if context was cancelled before processing
+		if ctx.Err() != nil {
+			result := models.DownloadResult{
+				URL:        job.URL,
+				Host:       parser.HostnameFromURL(job.URL),
+				Downloaded: []string{},
+				Errors:     []string{"download cancelled by user"},
+				Duration:   0,
+			}
+
+			select {
+			case results <- result:
+			case <-ctx.Done():
+				return
+			}
+
+			// Update progress
+			count := atomic.AddInt32(completed, 1)
+			if callback != nil {
+				callback(int(count), total)
+			}
+			continue
+		}
+
+		result := d.processJob(ctx, job)
+
+		// Send result with context awareness
+		select {
+		case results <- result:
+		case <-ctx.Done():
+			return
+		}
+
+		// Update progress
+		count := atomic.AddInt32(completed, 1)
+		if callback != nil {
+			callback(int(count), total)
+		}
+	}
+}
+
+// workerWithRateLimit processes download jobs with rate limiting
+func (d *Downloader) workerWithRateLimit(ctx context.Context, wg *sync.WaitGroup, jobs <-chan Job, results chan<- models.DownloadResult, limiter *ratelimit.Limiter, completed *int32, total int, callback ProgressCallback) {
+	defer wg.Done()
+
+	for job := range jobs {
+		// Check if context was cancelled
+		if ctx.Err() != nil {
+			result := models.DownloadResult{
+				URL:        job.URL,
+				Host:       parser.HostnameFromURL(job.URL),
+				Downloaded: []string{},
+				Errors:     []string{"download cancelled by user"},
+				Duration:   0,
+			}
+
+			select {
+			case results <- result:
+			case <-ctx.Done():
+				return
+			}
+
+			count := atomic.AddInt32(completed, 1)
+			if callback != nil {
+				callback(int(count), total)
+			}
+			continue
+		}
+
+		// Wait for rate limiter
+		if err := limiter.Wait(ctx); err != nil {
+			// Rate limiter cancelled by context
+			result := models.DownloadResult{
+				URL:        job.URL,
+				Host:       parser.HostnameFromURL(job.URL),
+				Downloaded: []string{},
+				Errors:     []string{"rate limiter cancelled"},
+				Duration:   0,
+			}
+
+			select {
+			case results <- result:
+			case <-ctx.Done():
+				return
+			}
+
+			count := atomic.AddInt32(completed, 1)
+			if callback != nil {
+				callback(int(count), total)
+			}
+			continue
+		}
+
+		result := d.processJob(ctx, job)
+
+		// Send result
+		select {
+		case results <- result:
+		case <-ctx.Done():
+			return
+		}
+
+		// Update progress
+		count := atomic.AddInt32(completed, 1)
+		if callback != nil {
+			callback(int(count), total)
 		}
 	}
 }
@@ -199,8 +368,11 @@ func (d *Downloader) downloadAndSaveStream(ctx context.Context, url, host, filen
 		}
 	}()
 
+	// Extract URL path for storage strategy
+	urlPath := parser.PathFromURL(url)
+
 	// Save from the pipe reader
-	filepath, bytesWritten, err := d.storage.SaveFileFromReader(host, filename, pr)
+	filepath, bytesWritten, err := d.storage.SaveFileFromReader(host, urlPath, filename, pr)
 
 	// Check if download had an error
 	if downloadErr != nil {

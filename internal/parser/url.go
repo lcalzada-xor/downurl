@@ -92,6 +92,15 @@ func HostnameFromURL(rawURL string) string {
 	return parsed.Host
 }
 
+// PathFromURL extracts the path component from a URL
+func PathFromURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Path
+}
+
 // sanitizeFilename replaces unsafe characters with underscores
 func sanitizeFilename(name string) string {
 	var result strings.Builder

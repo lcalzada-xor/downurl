@@ -11,21 +11,22 @@ func TestFileStorage_SaveFile_Collision(t *testing.T) {
 	// Create temporary directory
 	tmpDir := t.TempDir()
 
-	fs := NewFileStorage(tmpDir)
+	fs := NewFileStorage(tmpDir, "flat")
 
 	testData1 := []byte("test content 1")
 	testData2 := []byte("test content 2 - different")
 	host := "example.com"
+	urlPath := "/api/test.js"
 	filename := "test.js"
 
 	// Save first file
-	path1, err := fs.SaveFile(host, filename, testData1)
+	path1, err := fs.SaveFile(host, urlPath, filename, testData1)
 	if err != nil {
 		t.Fatalf("SaveFile() first call error = %v", err)
 	}
 
 	// Save second file with same name (should create unique name)
-	path2, err := fs.SaveFile(host, filename, testData2)
+	path2, err := fs.SaveFile(host, urlPath, filename, testData2)
 	if err != nil {
 		t.Fatalf("SaveFile() second call error = %v", err)
 	}
@@ -52,8 +53,8 @@ func TestFileStorage_SaveFile_Collision(t *testing.T) {
 		t.Error("File contents should be different")
 	}
 
-	// Verify second file has counter suffix
-	expectedPath2 := filepath.Join(tmpDir, host, "js", "test_1.js")
+	// Verify second file has counter suffix (in flat mode, files go to base dir)
+	expectedPath2 := filepath.Join(tmpDir, "test_1.js")
 	if path2 != expectedPath2 {
 		t.Errorf("Second file path = %s, want %s", path2, expectedPath2)
 	}
@@ -63,9 +64,10 @@ func TestFileStorage_SaveFile_ConcurrentWrites(t *testing.T) {
 	// Create temporary directory
 	tmpDir := t.TempDir()
 
-	fs := NewFileStorage(tmpDir)
+	fs := NewFileStorage(tmpDir, "flat")
 
 	host := "example.com"
+	urlPath := "/concurrent.js"
 	filename := "concurrent.js"
 	numGoroutines := 10
 
@@ -78,7 +80,7 @@ func TestFileStorage_SaveFile_ConcurrentWrites(t *testing.T) {
 		go func(index int) {
 			defer wg.Done()
 			data := []byte("content from goroutine " + string(rune(index)))
-			path, err := fs.SaveFile(host, filename, data)
+			path, err := fs.SaveFile(host, urlPath, filename, data)
 			if err != nil {
 				t.Errorf("SaveFile() concurrent error = %v", err)
 				return
@@ -110,21 +112,22 @@ func TestFileStorage_SaveFile_ConcurrentWrites(t *testing.T) {
 
 func TestFileStorage_SaveFile_NoExtension(t *testing.T) {
 	tmpDir := t.TempDir()
-	fs := NewFileStorage(tmpDir)
+	fs := NewFileStorage(tmpDir, "flat")
 
 	testData1 := []byte("content 1")
 	testData2 := []byte("content 2")
 	host := "example.com"
+	urlPath := "/noextension"
 	filename := "noextension"
 
 	// Save first file
-	path1, err := fs.SaveFile(host, filename, testData1)
+	path1, err := fs.SaveFile(host, urlPath, filename, testData1)
 	if err != nil {
 		t.Fatalf("SaveFile() error = %v", err)
 	}
 
 	// Save second file with same name
-	path2, err := fs.SaveFile(host, filename, testData2)
+	path2, err := fs.SaveFile(host, urlPath, filename, testData2)
 	if err != nil {
 		t.Fatalf("SaveFile() error = %v", err)
 	}
@@ -134,8 +137,8 @@ func TestFileStorage_SaveFile_NoExtension(t *testing.T) {
 		t.Error("Files with no extension should still get unique names")
 	}
 
-	// Second file should have _1 suffix
-	expectedPath2 := filepath.Join(tmpDir, host, "js", "noextension_1")
+	// Second file should have _1 suffix (in flat mode)
+	expectedPath2 := filepath.Join(tmpDir, "noextension_1")
 	if path2 != expectedPath2 {
 		t.Errorf("Second file path = %s, want %s", path2, expectedPath2)
 	}

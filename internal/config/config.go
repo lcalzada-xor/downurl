@@ -51,6 +51,21 @@ type Config struct {
 	OutputFormat string // Output format: text, json, csv, markdown
 	OutputFile   string // Output file path (for JSON/CSV/Markdown)
 	PrettyJSON   bool   // Pretty print JSON
+
+	// Storage mode
+	StorageMode string // Storage organization mode: flat, path, host, type, dated
+
+	// UI/UX options
+	Quiet      bool   // Suppress progress output
+	NoProgress bool   // Disable progress bar
+	SaveConfig string // Save current config to file
+
+	// Advanced options
+	RateLimit string        // Rate limit (e.g., "10/minute")
+	Watch     bool          // Watch input file for changes
+	Schedule  string        // Schedule downloads (e.g., "5m", "1h")
+	UseStdin  bool          // Read URLs from stdin
+	SingleURL string        // Single URL to download (quick mode)
 }
 
 // Load parses command line flags and environment variables to create a Config
@@ -97,6 +112,13 @@ func Load() *Config {
 		fmt.Fprintf(os.Stderr, "  --output-format, -f string  Output format: text, json, csv, markdown (default: text)\n")
 		fmt.Fprintf(os.Stderr, "  --output-file, -P string    Output file path (for JSON/CSV/Markdown)\n")
 		fmt.Fprintf(os.Stderr, "  --pretty-json, -J           Pretty print JSON output (default: true)\n")
+		fmt.Fprintf(os.Stderr, "\nStorage Mode Options:\n")
+		fmt.Fprintf(os.Stderr, "  --mode string               Storage organization mode (default: flat)\n")
+		fmt.Fprintf(os.Stderr, "                              - flat: All files in single directory\n")
+		fmt.Fprintf(os.Stderr, "                              - path: Replicate URL directory structure\n")
+		fmt.Fprintf(os.Stderr, "                              - host: Group files by hostname\n")
+		fmt.Fprintf(os.Stderr, "                              - type: Organize by file extension\n")
+		fmt.Fprintf(os.Stderr, "                              - dated: Organize by download date\n")
 	}
 
 	// Define flags with long and short versions
@@ -174,7 +196,29 @@ func Load() *Config {
 	flag.BoolVar(&cfg.PrettyJSON, "J", true, "Pretty print JSON output [shorthand]")
 	flag.BoolVar(&cfg.PrettyJSON, "pretty-json", true, "Pretty print JSON output")
 
+	// Storage mode flags
+	flag.StringVar(&cfg.StorageMode, "mode", getEnvOrDefault("STORAGE_MODE", "flat"), "Storage organization mode")
+
+	// UI/UX flags
+	flag.BoolVar(&cfg.Quiet, "quiet", false, "Suppress progress output")
+	flag.BoolVar(&cfg.NoProgress, "no-progress", false, "Disable progress bar")
+	flag.StringVar(&cfg.SaveConfig, "save-config", "", "Save current config to file (e.g., .downurlrc)")
+
+	// Advanced flags
+	flag.StringVar(&cfg.RateLimit, "rate-limit", "", "Rate limit requests (e.g., '10/minute', '100/hour')")
+	flag.BoolVar(&cfg.Watch, "watch", false, "Watch input file for changes and auto-download")
+	flag.StringVar(&cfg.Schedule, "schedule", "", "Schedule periodic downloads (e.g., '5m', '1h')")
+
 	flag.Parse()
+
+	// Check for stdin or single URL argument
+	if flag.NArg() > 0 {
+		arg := flag.Arg(0)
+		// If it looks like a URL, treat it as single URL mode
+		if len(arg) > 7 && (arg[:7] == "http://" || arg[:8] == "https://") {
+			cfg.SingleURL = arg
+		}
+	}
 
 	// Validate required fields
 	if cfg.InputFile == "" && flag.NArg() > 0 {
